@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="color-scheme" content="light only">
-<title>Angry Bulls v1.1</title>
+<title>Angry Bulls v1.2</title>
 <style>
 :root{color-scheme:light only;--ink:#1E1410;--cream:#F7EFE1;--red:#D9453A;--paper:#FFFFFF}
 *{box-sizing:border-box}
@@ -97,7 +97,7 @@ function build(){
 }
 function spawn(){
  if(shots<=0)return;
- active=M.Bodies.circle(START.x,START.y,BULL_R,{restitution:0.4,friction:0.5,slop:0.005,density:0.0075,label:'bull',render:{visible:false}});
+ active=M.Bodies.circle(START.x,START.y,BULL_R,{restitution:0.4,friction:0.5,slop:0.005,density:0.0075,sleepThreshold:Infinity,label:'bull',render:{visible:false}});
  active.isStatic=true;active.launched=false;bulls.push(active);
  M.Composite.add(engine.world,active);
 }
@@ -141,7 +141,8 @@ function up(){
  let dx=START.x-mx,dy=START.y-my;const d=Math.hypot(dx,dy);
  if(d<10)return;
  const cap=Math.min(d,MAXPULL)/d;dx*=cap;dy*=cap;
- active.isStatic=false;active.launched=true;shots--;hud();
+ M.Body.setStatic(active,false);M.Sleeping.set(active,false);
+ active.launched=true;shots--;hud();
  M.Body.setVelocity(active,{x:dx*POWER,y:dy*POWER});
  const fired=active;active=null;
  setTimeout(function(){if(!over){spawn();check();}},2400);

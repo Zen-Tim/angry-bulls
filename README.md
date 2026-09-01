@@ -38,6 +38,15 @@ all verified by running the level headless for 15 simulated seconds with no shot
 Bears have their rotation locked (`setInertia(body, Infinity)`). They are circles resting on flat beams,
 so without the lock they roll off unaided. They still get knocked around when hit.
 
+Sleeping has one trap. The bull sits motionless on the sling while the player aims, so the engine puts it
+to sleep after about a second. A sleeping body is skipped by the physics update, so `setVelocity` on release
+did nothing at all and the bull would not fire. Two fixes together: the bull is created with
+`sleepThreshold: Infinity` so it never sleeps while waiting, and release calls `Body.setStatic(body, false)`
+followed by `Sleeping.set(body, false)` before applying the velocity.
+
+Also note `Body.setStatic()` is required to un-freeze a body. Assigning `body.isStatic = false` directly leaves
+the inverse mass at zero, because the real setter is what restores it.
+
 Measured drift over 15 seconds with nothing touching the level: blocks move 3.8 px and rotate 0.1 degrees,
 which is first-second settling and is not visible.
 
@@ -53,6 +62,7 @@ Vercel Authentication must stay disabled on the project or visitors get a login 
 
 ## Version history
 
+- v1.2 — launch fix: the waiting bull was falling asleep on the sling, so the release did nothing
 - v1.1 — stability fix: solver settings, towers respaced to 470 and 800, bear rotation locked
 - v1.0 — first playable: six-storey towers, sprite caching for the bull and bear art
 
