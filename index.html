@@ -4,153 +4,383 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="color-scheme" content="light only">
-<title>Angry Bulls v1.2</title>
+<title>Angry Bulls v2.0</title>
 <style>
-:root{color-scheme:light only;--ink:#1E1410;--cream:#F7EFE1;--red:#D9453A;--paper:#FFFFFF}
+:root{color-scheme:light only;--ink:#1E1410;--cream:#F7EFE1;--red:#D9453A;--green:#2E9E5B;--paper:#FFFFFF;--mute:#6B5A4A}
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:var(--cream);color:var(--ink);-webkit-text-size-adjust:100%}
+body,canvas{-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
 body{font-family:"Trebuchet MS","Verdana",system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;min-height:100dvh;padding:16px 12px 28px}
 header{width:100%;max-width:1000px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:10px}
 h1{font-size:30px;letter-spacing:1px;margin:0;text-transform:uppercase}
 .sub{font-size:13px;letter-spacing:3px;color:var(--red);text-transform:uppercase}
+#picker{width:100%;max-width:1000px;display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.lvl{font:inherit;font-size:13px;padding:7px 12px;border:3px solid var(--ink);border-radius:10px;background:var(--paper);cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:2px;line-height:1.2;min-width:150px}
+.lvl.on{background:var(--ink);color:var(--cream)}
+.lvl .nm{font-weight:bold;letter-spacing:.5px}
+.lvl .st{font-size:12px;letter-spacing:2px;color:#C9962B}
+.lvl.on .st{color:#F0C043}
 .wrap{width:100%;max-width:1000px;border:4px solid var(--ink);border-radius:14px;overflow:hidden;background:#EAF3FB;position:relative}
 canvas{display:block;width:100%;height:auto;touch-action:none}
-#banner{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(247,239,225,.88)}
+#banner{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(247,239,225,.9)}
 #banner.on{display:flex}
-#banner div{text-align:center}
-#banner p{margin:0 0 14px;font-size:34px;text-transform:uppercase;letter-spacing:1px}
+#card{text-align:center;max-width:460px;padding:0 20px}
+#card p.big{margin:0 0 6px;font-size:34px;text-transform:uppercase;letter-spacing:1px}
+#stars{font-size:40px;letter-spacing:6px;color:#C9962B;margin:0 0 10px;min-height:48px}
+#lines{margin:0 0 16px;font-size:15px;color:var(--mute);line-height:1.8}
+#lines b{color:var(--ink)}
+.btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 button{font:inherit;font-size:16px;padding:10px 20px;border:3px solid var(--ink);border-radius:10px;background:var(--paper);cursor:pointer}
 button:active{transform:translateY(1px)}
 #hud{width:100%;max-width:1000px;display:flex;align-items:center;gap:20px;margin-top:12px;font-size:15px;flex-wrap:wrap}
 #hud b{font-size:20px}
-#hud .right{margin-left:auto;display:flex;gap:10px}
-.tip{width:100%;max-width:1000px;margin-top:10px;font-size:13px;color:#6B5A4A;line-height:1.6}
+#hud .right{margin-left:auto;display:flex;gap:10px;align-items:center}
+#pnl{font-variant-numeric:tabular-nums}
+.tip{width:100%;max-width:1000px;margin-top:10px;font-size:13px;color:var(--mute);line-height:1.6}
 </style>
 </head>
 <body>
 <header>
 <h1>Angry Bulls</h1><span class="sub">Bulls vs bears</span>
 </header>
+<div id="picker"></div>
 <div class="wrap">
 <canvas id="cv" width="1000" height="620"></canvas>
-<div id="banner"><div><p id="banner-text">Cleared</p><button id="again">Play again</button></div></div>
+<div id="banner"><div id="card">
+<p class="big" id="banner-text">Cleared</p>
+<p id="stars"></p>
+<p id="lines"></p>
+<div class="btns"><button id="again">Replay level</button><button id="next">Next level</button></div>
+</div></div>
 </div>
 <div id="hud">
 <span>Bears <b id="left">5</b></span>
 <span>Shots <b id="shots">6</b></span>
-<span class="right"><button id="reset">Restart level</button></span>
+<span>P&amp;L <b id="pnl">$0</b></span>
+<span class="right"><span>Best <b id="best">$0</b></span><button id="reset">Restart level</button></span>
 </div>
-<p class="tip">Drag the bull back from the sling and let go. The towers are candlesticks: green ones are bull bars, red ones are bear bars. Hit the base of an upright and the whole tower comes down, which beats aiming straight at a bear.</p>
+<p class="tip" id="tip"></p>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
 <script>
 (function(){
-const M=window.Matter,W=1000,H=620,INK='#1E1410';
-const cv=document.getElementById('cv');
-const engine=M.Engine.create();
-engine.gravity.y=1.1;
-engine.enableSleeping=true;
-engine.positionIterations=40;
-engine.velocityIterations=16;
-engine.constraintIterations=6;
-const render=M.Render.create({canvas:cv,engine:engine,options:{width:W,height:H,wireframes:false,background:'#EAF3FB'}});
-M.Render.run(render);M.Runner.run(M.Runner.create(),engine);
-const ctx=render.context;
-const START={x:112,y:392},MAXPULL=185,POWER=0.19,BULL_R=23,BEAR_R=22;
-const GT=580,UH=44,BH=24,UW=32;
-const HS=[62,56,50,44,38,32],BW=[176,164,152,140,128,116];
-let bulls=[],bears=[],active=null,shots=6,dragging=false,mx=0,my=0,over=false;
+/*LEVELS_START*/
+// Pure geometry and level data. No DOM, no Matter. The headless test harness
+// evaluates exactly this block, so it must stay free of browser globals.
+var GT=580;              // top surface of the ground
+var PW=34,PH=50;         // upright candle: width, height
+var BH=24;               // beam candle height
+var STOREY=PH+BH;        // 74 px per storey
+var BEAR_R=22;
 
-function candle(x,y,w,h,bull){
- return M.Bodies.rectangle(x,y,w,h,{restitution:0,friction:0.9,frictionStatic:1.2,slop:0.005,density:0.0014,label:'candle',
-  render:{fillStyle:bull?'#2E9E5B':'#D9453A',strokeStyle:INK,lineWidth:2}});
+// One upright standing on the surface at y=base.
+function post(x,base,t){return{x:x,y:base-PH/2,w:PW,h:PH,t:t};}
+// One beam lying across the tops of a pair of uprights.
+function beam(cx,base,w,t){return{x:cx,y:base-PH-BH/2,w:w,h:BH,t:t};}
+
+// One storey: two uprights at cx+/-span with a beam spanning their outer edges,
+// so each beam end is carried directly by an upright. Returns the new surface.
+function storey(out,cx,base,span,bull){
+ out.push(post(cx-span,base,bull?'g':'r'));
+ out.push(post(cx+span,base,bull?'g':'r'));
+ out.push(beam(cx,base,span*2+PW,bull?'r':'g'));
+ return base-STOREY;
+}
+// A tapering tower. spans[] runs bottom to top and must shrink, so every
+// upright lands well inside the beam below it. Returns the top surface y.
+function tower(out,cx,base,spans){
+ var b=base;
+ for(var i=0;i<spans.length;i++){b=storey(out,cx,b,spans[i],i%2===0);}
+ return b;
+}
+function bearOn(surface){return surface-BEAR_R-2;}
+
+function levelDoubleTop(){
+ var B=[],E=[],top;
+ top=tower(B,400,GT,[70,60,50,40]); E.push({x:400,y:bearOn(top)});
+ top=tower(B,830,GT,[70,60,50,40]); E.push({x:830,y:bearOn(top)});
+ top=tower(B,615,GT,[76,62]);       E.push({x:615,y:bearOn(top)});
+ E.push({x:400,y:GT-BEAR_R-2});
+ E.push({x:830,y:GT-BEAR_R-2});
+ return {id:'double-top',name:'Double Top',
+  note:'Two equal highs with a soft middle. Take out a ground-floor upright and the whole high comes down.',
+  shots:6,blocks:B,bears:E};
+}
+function levelHeadShoulders(){
+ var B=[],E=[],top;
+ top=tower(B,380,GT,[66,56,46]);       E.push({x:380,y:bearOn(top)});
+ top=tower(B,620,GT,[70,60,50,40,32]); E.push({x:620,y:bearOn(top)});
+ top=tower(B,860,GT,[66,56,46]);       E.push({x:860,y:bearOn(top)});
+ E.push({x:380,y:GT-BEAR_R-2});
+ E.push({x:620,y:GT-BEAR_R-2});
+ E.push({x:860,y:GT-BEAR_R-2});
+ return {id:'head-shoulders',name:'Head and Shoulders',
+  note:'The head is tall and top heavy. Knock its base out and it falls into a shoulder.',
+  shots:6,blocks:B,bears:E};
+}
+function levelBullFlag(){
+ var B=[],E=[],top;
+ top=tower(B,360,GT,[66,56,46,38,30]); E.push({x:360,y:bearOn(top)});
+ top=tower(B,560,GT,[62,50,40]);       E.push({x:560,y:bearOn(top)});
+ top=tower(B,730,GT,[58,46]);          E.push({x:730,y:bearOn(top)});
+ top=tower(B,890,GT,[56]);             E.push({x:890,y:bearOn(top)});
+ E.push({x:360,y:GT-BEAR_R-2});
+ E.push({x:560,y:GT-BEAR_R-2});
+ return {id:'bull-flag',name:'Bull Flag',
+  note:'A tall pole then a drift lower. The pole is the heaviest thing on the board, so make it fall right.',
+  shots:6,blocks:B,bears:E};
+}
+var LEVELS=[levelDoubleTop(),levelHeadShoulders(),levelBullFlag()];
+
+// Every physical constant lives here, inside the shared block, so the game and
+// the headless harness can never drift apart. Tuned by the harness, not by eye.
+var PHYS={
+ gravity:1,
+ positionIterations:16, velocityIterations:10, constraintIterations:4,
+ // Sleeping stays OFF. See the note next to the engine.
+ sleeping:false,
+ ground:{friction:1,frictionStatic:1.2,slop:0.05},
+ candle:{restitution:0,friction:0.85,frictionStatic:1.1,frictionAir:0.012,slop:0.05,density:0.0026},
+ bear:  {restitution:0,friction:0.95,frictionStatic:1.2,frictionAir:0.012,slop:0.05,density:0.0016},
+ bull:  {restitution:0.35,friction:0.6,frictionAir:0.012,slop:0.05,density:0.016},
+ bullR:23, maxPull:115, power:0.386,
+ hpPost:3, hpBeam:4,
+ breakAt:7, breakStep:6,     // damage = ceil((v - breakAt) / breakStep)
+ bearKO:4.5                  // relative speed that takes a bear out
+};
+function damageAt(v){return Math.ceil((v-PHYS.breakAt)/PHYS.breakStep);}
+
+// Scoring, in dollars of profit.
+var PAY_BEAR=2500,PAY_BLOCK=400,PAY_SHOT=3000;
+function maxScore(L){return L.bears.length*PAY_BEAR+L.blocks.length*PAY_BLOCK+(L.shots-1)*PAY_SHOT;}
+function starCuts(L){var m=maxScore(L);return [Math.round(m*0.50),Math.round(m*0.68),Math.round(m*0.82)];}
+/*LEVELS_END*/
+
+var M=window.Matter,W=1000,H=620,INK='#1E1410';
+var cv=document.getElementById('cv');
+
+// Sleeping stays OFF. A sleeping body only wakes on an applied force, a
+// collision with a moving body, or its own motion. Knock the support out from
+// under one and none of those three fire, so it hangs in mid air. That was the
+// floating tower bug in v1.2. Stability now comes from geometry and the solver.
+var engine=M.Engine.create();
+engine.gravity.y=PHYS.gravity;
+engine.enableSleeping=PHYS.sleeping;
+engine.positionIterations=PHYS.positionIterations;
+engine.velocityIterations=PHYS.velocityIterations;
+engine.constraintIterations=PHYS.constraintIterations;
+
+var render=M.Render.create({canvas:cv,engine:engine,options:{width:W,height:H,wireframes:false,background:'#EAF3FB'}});
+M.Render.run(render);
+M.Runner.run(M.Runner.create(),engine);
+var ctx=render.context;
+
+var START={x:150,y:392},MAXPULL=PHYS.maxPull,POWER=PHYS.power,BULL_R=PHYS.bullR;
+// Aim preview constants, fitted against the engine itself by the headless
+// harness. Matter integrates v = v*(1-frictionAir) + gravity*scale*delta^2,
+// so the dotted arc has to damp and drop the same way or it lies to the player.
+var DAMP=0.988,GDROP=0.278;
+var GREEN='#2E9E5B',RED='#D9453A';
+
+var lvl=0,blocks=[],bears=[],bulls=[],active=null,shots=6,score=0;
+var dragging=false,mx=0,my=0,over=false,pops=[],saved=readSave();
+
+/* ---------- saved best scores ---------- */
+function readSave(){
+ try{var r=localStorage.getItem('angry-bulls-v2');return r?JSON.parse(r):{};}catch(e){return {};}
+}
+function writeSave(){
+ try{localStorage.setItem('angry-bulls-v2',JSON.stringify(saved));}catch(e){}
+}
+function starsFor(L,s){var c=starCuts(L),n=0;for(var i=0;i<3;i++){if(s>=c[i])n=i+1;}return n;}
+function pips(n){return '★★★'.slice(0,n)+'☆☆☆'.slice(0,3-n);}
+function money(n){return '$'+n.toLocaleString('en-US');}
+
+/* ---------- bodies ---------- */
+function opts(base,extra){var o={},k;for(k in base)o[k]=base[k];for(k in extra)o[k]=extra[k];return o;}
+function candle(spec){
+ var b=M.Bodies.rectangle(spec.x,spec.y,spec.w,spec.h,opts(PHYS.candle,{label:'candle',
+  render:{fillStyle:spec.t==='g'?GREEN:RED,strokeStyle:INK,lineWidth:2}}));
+ b.hp=spec.h>spec.w?PHYS.hpPost:PHYS.hpBeam;   // uprights snap sooner than beams
+ blocks.push(b);
+ return b;
 }
 function bear(x,y){
- const b=M.Bodies.circle(x,y,BEAR_R,{restitution:0,friction:0.95,frictionStatic:1.2,slop:0.005,density:0.0010,label:'bear',render:{visible:false}});
- M.Body.setInertia(b,Infinity);
- bears.push(b);return b;
+ var b=M.Bodies.circle(x,y,BEAR_R,opts(PHYS.bear,{label:'bear',render:{visible:false}}));
+ M.Body.setInertia(b,Infinity);   // bears are circles on flat beams, so lock the roll
+ bears.push(b);
+ return b;
 }
-function tower(cx,parts){
- for(let i=0;i<6;i++){
-  const base=GT-i*(UH+BH),uy=base-UH/2,by=base-UH-BH/2,bull=i%2===0;
-  parts.push(candle(cx-HS[i],uy,UW,UH,bull));
-  parts.push(candle(cx+HS[i],uy,UW,UH,!bull));
-  parts.push(candle(cx,by,BW[i],BH,bull));
- }
- parts.push(bear(cx,150));
-}
+
 function build(){
- M.Composite.clear(engine.world,false);bulls=[];bears=[];active=null;shots=6;over=false;
+ var L=LEVELS[lvl];
+ M.Composite.clear(engine.world,false);
+ blocks=[];bears=[];bulls=[];active=null;pops=[];
+ shots=L.shots;score=0;over=false;
  document.getElementById('banner').classList.remove('on');
- const parts=[
-  M.Bodies.rectangle(500,596,2200,32,{isStatic:true,friction:1,frictionStatic:1.2,slop:0.005,render:{fillStyle:'#7FA85C'}}),
-  M.Bodies.rectangle(112,506,22,116,{isStatic:true,friction:1,slop:0.005,render:{fillStyle:'#8B5E3C'}})
+ var parts=[
+  M.Bodies.rectangle(500,GT+16,2400,32,opts(PHYS.ground,{isStatic:true,render:{fillStyle:'#7FA85C'}})),
+  M.Bodies.rectangle(START.x,GT-74,22,148,opts(PHYS.ground,{isStatic:true,render:{fillStyle:'#8B5E3C'}}))
  ];
- tower(470,parts);tower(800,parts);
- parts.push(bear(470,422));
- parts.push(bear(800,558));
- parts.push(candle(595,558,UW,UH,false));
- parts.push(candle(675,558,UW,UH,false));
- parts.push(candle(635,524,120,BH,true));
- parts.push(bear(635,558));
+ L.blocks.forEach(function(s){parts.push(candle(s));});
+ L.bears.forEach(function(s){parts.push(bear(s.x,s.y));});
  M.Composite.add(engine.world,parts);
- spawn();hud();
+ spawn();paint();
 }
 function spawn(){
  if(shots<=0)return;
- active=M.Bodies.circle(START.x,START.y,BULL_R,{restitution:0.4,friction:0.5,slop:0.005,density:0.0075,sleepThreshold:Infinity,label:'bull',render:{visible:false}});
- active.isStatic=true;active.launched=false;bulls.push(active);
+ active=M.Bodies.circle(START.x,START.y,BULL_R,opts(PHYS.bull,{sleepThreshold:Infinity,label:'bull',render:{visible:false}}));
+ M.Body.setStatic(active,true);
+ active.launched=false;active.rest=0;
+ bulls.push(active);
  M.Composite.add(engine.world,active);
 }
-function hud(){
+
+/* ---------- hud ---------- */
+function paint(){
+ var L=LEVELS[lvl];
  document.getElementById('left').textContent=bears.length;
  document.getElementById('shots').textContent=Math.max(shots,0);
+ document.getElementById('pnl').textContent=money(score);
+ document.getElementById('best').textContent=money(saved[L.id]?saved[L.id].best:0);
+ document.getElementById('tip').textContent=L.note+' Drag the bull back from the sling and let go.';
 }
-function finish(t){
+function drawPicker(){
+ var p=document.getElementById('picker');
+ p.innerHTML='';
+ LEVELS.forEach(function(L,i){
+  var b=document.createElement('button');
+  b.className='lvl'+(i===lvl?' on':'');
+  b.innerHTML='<span class="nm">'+(i+1)+'. '+L.name+'</span><span class="st">'+pips(saved[L.id]?saved[L.id].stars:0)+'</span>';
+  b.addEventListener('click',function(){lvl=i;build();drawPicker();});
+  p.appendChild(b);
+ });
+}
+
+/* ---------- scoring ---------- */
+function award(n,x,y,txt){
+ score+=n;
+ pops.push({x:x,y:y,txt:txt||('+'+money(n)),t:0});
+ paint();
+}
+function finish(win){
+ if(over)return;
  over=true;
- document.getElementById('banner-text').textContent=t;
+ var L=LEVELS[lvl],bonus=0;
+ if(win&&shots>0){bonus=shots*PAY_SHOT;score+=bonus;}
+ var st=win?starsFor(L,score):0;
+ var prev=saved[L.id]||{best:0,stars:0};
+ if(score>prev.best||st>prev.stars){
+  saved[L.id]={best:Math.max(score,prev.best),stars:Math.max(st,prev.stars)};
+  writeSave();
+ }
+ document.getElementById('banner-text').textContent=win?'Position closed':'Stopped out';
+ document.getElementById('stars').textContent=win?pips(st):'';
+ var html='Trade P&amp;L <b>'+money(score-bonus)+'</b>';
+ if(bonus)html+='<br>Unused risk, '+shots+' shots <b>+'+money(bonus)+'</b>';
+ html+='<br>Total <b>'+money(score)+'</b>';
+ html+='<br>Best on this level <b>'+money(saved[L.id]?saved[L.id].best:score)+'</b>';
+ document.getElementById('lines').innerHTML=html;
+ document.getElementById('next').style.display=(win&&lvl<LEVELS.length-1)?'':'none';
  document.getElementById('banner').classList.add('on');
+ paint();drawPicker();
 }
 function check(){
  if(over)return;
- if(bears.length===0)finish('Cleared');
- else if(shots<=0&&!active)finish('Out of shots');
+ if(bears.length===0){finish(true);return;}
+ if(shots<=0&&!active){
+  var moving=false;
+  bulls.concat(blocks).forEach(function(b){if(b.speed>0.6)moving=true;});
+  if(!moving)finish(false);
+ }
+}
+
+/* ---------- damage ---------- */
+function relSpeed(a,b){return Math.hypot(a.velocity.x-b.velocity.x,a.velocity.y-b.velocity.y);}
+function killBear(b){
+ M.Composite.remove(engine.world,b);
+ bears=bears.filter(function(x){return x!==b;});
+ award(PAY_BEAR,b.position.x,b.position.y-30);
+ check();
+}
+function breakBlock(b){
+ M.Composite.remove(engine.world,b);
+ blocks=blocks.filter(function(x){return x!==b;});
+ award(PAY_BLOCK,b.position.x,b.position.y);
 }
 M.Events.on(engine,'collisionStart',function(e){
  e.pairs.forEach(function(p){
+  var v=relSpeed(p.bodyA,p.bodyB);
   [[p.bodyA,p.bodyB],[p.bodyB,p.bodyA]].forEach(function(pr){
-   const b=pr[0],o=pr[1];
-   if(b.label!=='bear')return;
-   const v=Math.hypot(b.velocity.x-o.velocity.x,b.velocity.y-o.velocity.y);
-   if(v>5.2){M.Composite.remove(engine.world,b);bears=bears.filter(function(x){return x!==b;});hud();check();}
+   var b=pr[0];
+   if(over)return;
+   if(b.label==='bear'&&v>PHYS.bearKO&&bears.indexOf(b)>=0){killBear(b);return;}
+   if(b.label==='candle'&&v>PHYS.breakAt&&blocks.indexOf(b)>=0){
+    b.hp-=damageAt(v);
+    if(b.hp<=0)breakBlock(b);
+   }
   });
  });
 });
+
+/* ---------- input ---------- */
 function pos(ev){
- const r=cv.getBoundingClientRect();
- const t=ev.touches&&ev.touches.length?ev.touches[0]:ev;
+ var r=cv.getBoundingClientRect();
+ var t=ev.touches&&ev.touches.length?ev.touches[0]:ev;
  return{x:(t.clientX-r.left)*(W/r.width),y:(t.clientY-r.top)*(H/r.height)};
 }
 function down(ev){
  if(!active||active.launched||over)return;
- const p=pos(ev);
+ var p=pos(ev);
  if(Math.hypot(p.x-START.x,p.y-START.y)<95){dragging=true;mx=p.x;my=p.y;ev.preventDefault();}
 }
-function move(ev){if(!dragging)return;const p=pos(ev);mx=p.x;my=p.y;ev.preventDefault();}
+function move(ev){if(!dragging)return;var p=pos(ev);mx=p.x;my=p.y;ev.preventDefault();}
 function up(){
- if(!dragging||!active)return;dragging=false;
- let dx=START.x-mx,dy=START.y-my;const d=Math.hypot(dx,dy);
- if(d<10)return;
- const cap=Math.min(d,MAXPULL)/d;dx*=cap;dy*=cap;
- M.Body.setStatic(active,false);M.Sleeping.set(active,false);
- active.launched=true;shots--;hud();
+ if(!dragging||!active)return;
+ dragging=false;
+ if(Math.hypot(mx-START.x,my-START.y)<10)return;
+ var dp=pullPoint(),dx=START.x-dp.x,dy=START.y-dp.y;
+ // setStatic is the real un-freeze. Assigning isStatic directly leaves the
+ // inverse mass at zero, so the body would take the velocity and ignore it.
+ M.Body.setStatic(active,false);
+ M.Sleeping.set(active,false);
+ active.launched=true;shots--;paint();
  M.Body.setVelocity(active,{x:dx*POWER,y:dy*POWER});
- const fired=active;active=null;
- setTimeout(function(){if(!over){spawn();check();}},2400);
- setTimeout(function(){if(fired&&(fired.position.x>W+80||fired.position.y>H+80))M.Composite.remove(engine.world,fired);},4500);
+ active=null;
+ setTimeout(function(){if(!over){spawn();check();}},2200);
 }
-cv.addEventListener('mousedown',down);window.addEventListener('mousemove',move);window.addEventListener('mouseup',up);
-cv.addEventListener('touchstart',down,{passive:false});cv.addEventListener('touchmove',move,{passive:false});window.addEventListener('touchend',up);
+cv.addEventListener('mousedown',down);
+window.addEventListener('mousemove',move);
+window.addEventListener('mouseup',up);
+cv.addEventListener('touchstart',down,{passive:false});
+cv.addEventListener('touchmove',move,{passive:false});
+window.addEventListener('touchend',up);
 
+/* ---------- housekeeping each tick ---------- */
+M.Events.on(engine,'afterUpdate',function(){
+ for(var i=bulls.length-1;i>=0;i--){
+  var b=bulls[i];
+  if(b===active)continue;
+  if(b.position.y>H+120||b.position.x>W+120||b.position.x<-120){
+   M.Composite.remove(engine.world,b);bulls.splice(i,1);continue;
+  }
+  if(b.launched){
+   b.rest=b.speed<0.5?b.rest+1:0;
+   if(b.rest>90){M.Composite.remove(engine.world,b);bulls.splice(i,1);}
+  }
+ }
+ for(var j=bears.length-1;j>=0;j--){
+  if(bears[j].position.y>H+60){killBear(bears[j]);}
+ }
+ for(var k=blocks.length-1;k>=0;k--){
+  var c=blocks[k];
+  if(c.position.y>H+120||c.position.x>W+200||c.position.x<-200){
+   M.Composite.remove(engine.world,c);blocks.splice(k,1);
+  }
+ }
+ check();
+});
+
+/* ---------- character art ---------- */
 function faceArt(g,r,browOut,browIn){
  g.fillStyle='#FFFFFF';
  g.beginPath();g.ellipse(-0.36*r,-0.20*r,0.27*r,0.24*r,0,0,6.3);g.fill();
@@ -196,35 +426,71 @@ function bearArt(g,r){
  g.beginPath();g.ellipse(0,0.22*r,0.16*r,0.11*r,0,0,6.3);g.fill();
  faceArt(g,r,-0.62,-0.36);
 }
-const SS=3;
+var SS=3;
 function sprite(fn,r){
- const half=Math.ceil(r*1.9),c=document.createElement('canvas');
+ var half=Math.ceil(r*1.9),c=document.createElement('canvas');
  c.width=c.height=half*2*SS;
- const g=c.getContext('2d');g.scale(SS,SS);g.translate(half,half);
+ var g=c.getContext('2d');g.scale(SS,SS);g.translate(half,half);
  fn(g,r);
  return{img:c,half:half};
 }
-const SP_BULL=sprite(bullArt,BULL_R),SP_BEAR=sprite(bearArt,BEAR_R);
+var SP_BULL=sprite(bullArt,BULL_R),SP_BEAR=sprite(bearArt,BEAR_R);
 function stamp(s,x,y,a){
  ctx.save();ctx.translate(x,y);ctx.rotate(a);
  ctx.drawImage(s.img,-s.half,-s.half,s.half*2,s.half*2);
  ctx.restore();
 }
+
+// Where the bull actually sits while you drag: the pull, capped at MAXPULL.
+function pullPoint(){
+ var dx=mx-START.x,dy=my-START.y,d=Math.hypot(dx,dy)||1;
+ var cap=Math.min(d,MAXPULL)/d;
+ return{x:START.x+dx*cap,y:START.y+dy*cap};
+}
 M.Events.on(render,'afterRender',function(){
+ var dp=null;
  if(dragging&&active){
+  dp=pullPoint();
   ctx.strokeStyle=INK;ctx.lineWidth=6;ctx.lineCap='round';
-  ctx.beginPath();ctx.moveTo(112,442);ctx.lineTo(mx,my);ctx.lineTo(112,452);ctx.stroke();
-  let dx=START.x-mx,dy=START.y-my;const d=Math.hypot(dx,dy)||1,cap=Math.min(d,MAXPULL)/d;
-  let vx=dx*cap*POWER,vy=dy*cap*POWER,px=mx,py=my;
+  ctx.beginPath();ctx.moveTo(START.x-10,442);ctx.lineTo(dp.x,dp.y);ctx.lineTo(START.x+10,442);ctx.stroke();
+  var vx=(START.x-dp.x)*POWER,vy=(START.y-dp.y)*POWER,px=dp.x,py=dp.y;
+  // Stop the dotted path where the shot would actually land, so the preview
+  // does not draw a line straight through a tower it cannot pass through.
+  var solids=M.Composite.allBodies(engine.world).filter(function(b){return b!==active;});
   ctx.fillStyle='rgba(30,20,16,0.33)';
-  for(let i=0;i<34;i++){px+=vx;py+=vy;vy+=0.99;ctx.beginPath();ctx.arc(px,py,3,0,6.3);ctx.fill();}
+  for(var i=0;i<40;i++){
+   vx*=DAMP;vy=vy*DAMP+GDROP;
+   px+=vx;py+=vy;
+   if(px>W+40||py>H+40)break;
+   if(M.Query.point(solids,{x:px,y:py}).length)break;
+   ctx.beginPath();ctx.arc(px,py,3,0,6.3);ctx.fill();
+  }
  }
  bears.forEach(function(b){stamp(SP_BEAR,b.position.x,b.position.y,b.angle);});
- bulls.forEach(function(b){stamp(SP_BULL,b.position.x,b.position.y,b.angle);});
+ bulls.forEach(function(b){
+  if(b===active&&dp)stamp(SP_BULL,dp.x,dp.y,0);
+  else stamp(SP_BULL,b.position.x,b.position.y,b.angle);
+ });
+ ctx.font='bold 20px "Trebuchet MS",Verdana,sans-serif';
+ ctx.textAlign='center';
+ for(var k=pops.length-1;k>=0;k--){
+  var p=pops[k];p.t++;p.y-=0.9;
+  if(p.t>70){pops.splice(k,1);continue;}
+  ctx.globalAlpha=Math.max(0,1-p.t/70);
+  ctx.fillStyle='#1E1410';ctx.fillText(p.txt,p.x,p.y);
+  ctx.globalAlpha=1;
+ }
+ ctx.textAlign='start';
 });
-document.getElementById('reset').addEventListener('click',build);
-document.getElementById('again').addEventListener('click',build);
-build();
+
+document.getElementById('reset').addEventListener('click',function(){build();drawPicker();});
+document.getElementById('again').addEventListener('click',function(){build();drawPicker();});
+document.getElementById('next').addEventListener('click',function(){
+ if(lvl<LEVELS.length-1)lvl++;
+ build();drawPicker();
+});
+
+drawPicker();build();
 })();
 </script>
 </body>
