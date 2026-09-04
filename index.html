@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="color-scheme" content="light only">
-<title>Angry Bulls v2.0</title>
+<title>Angry Bulls v2.1</title>
 <style>
 :root{color-scheme:light only;--ink:#1E1410;--cream:#F7EFE1;--red:#D9453A;--green:#2E9E5B;--paper:#FFFFFF;--mute:#6B5A4A}
 *{box-sizing:border-box}
@@ -66,16 +66,20 @@ button:active{transform:translateY(1px)}
 /*LEVELS_START*/
 // Pure geometry and level data. No DOM, no Matter. The headless test harness
 // evaluates exactly this block, so it must stay free of browser globals.
+var CW=1000,CH=620;      // canvas size
 var GT=580;              // top surface of the ground
 var PW=34,PH=50;         // upright candle: width, height
 var BH=24;               // beam candle height
 var STOREY=PH+BH;        // 74 px per storey
 var BEAR_R=22;
+var SIGN_W=118,SIGN_H=44;
 
 // One upright standing on the surface at y=base.
 function post(x,base,t){return{x:x,y:base-PH/2,w:PW,h:PH,t:t};}
 // One beam lying across the tops of a pair of uprights.
 function beam(cx,base,w,t){return{x:cx,y:base-PH-BH/2,w:w,h:BH,t:t};}
+// A prop firm shop sign, standing on the surface at y=base.
+function sign(cx,base,logo){return{x:cx,y:base-SIGN_H/2,w:SIGN_W,h:SIGN_H,t:'s',logo:logo};}
 
 // One storey: two uprights at cx+/-span with a beam spanning their outer edges,
 // so each beam end is carried directly by an upright. Returns the new surface.
@@ -99,8 +103,8 @@ function levelDoubleTop(){
  top=tower(B,400,GT,[70,60,50,40]); E.push({x:400,y:bearOn(top)});
  top=tower(B,830,GT,[70,60,50,40]); E.push({x:830,y:bearOn(top)});
  top=tower(B,615,GT,[76,62]);       E.push({x:615,y:bearOn(top)});
- E.push({x:400,y:GT-BEAR_R-2});
- E.push({x:830,y:GT-BEAR_R-2});
+ E.push({x:400,y:bearOn(GT)});
+ E.push({x:830,y:bearOn(GT)});
  return {id:'double-top',name:'Double Top',
   note:'Two equal highs with a soft middle. Take out a ground-floor upright and the whole high comes down.',
   shots:6,blocks:B,bears:E};
@@ -110,9 +114,9 @@ function levelHeadShoulders(){
  top=tower(B,380,GT,[66,56,46]);       E.push({x:380,y:bearOn(top)});
  top=tower(B,620,GT,[70,60,50,40,32]); E.push({x:620,y:bearOn(top)});
  top=tower(B,860,GT,[66,56,46]);       E.push({x:860,y:bearOn(top)});
- E.push({x:380,y:GT-BEAR_R-2});
- E.push({x:620,y:GT-BEAR_R-2});
- E.push({x:860,y:GT-BEAR_R-2});
+ E.push({x:380,y:bearOn(GT)});
+ E.push({x:620,y:bearOn(GT)});
+ E.push({x:860,y:bearOn(GT)});
  return {id:'head-shoulders',name:'Head and Shoulders',
   note:'The head is tall and top heavy. Knock its base out and it falls into a shoulder.',
   shots:6,blocks:B,bears:E};
@@ -123,13 +127,26 @@ function levelBullFlag(){
  top=tower(B,560,GT,[62,50,40]);       E.push({x:560,y:bearOn(top)});
  top=tower(B,730,GT,[58,46]);          E.push({x:730,y:bearOn(top)});
  top=tower(B,890,GT,[56]);             E.push({x:890,y:bearOn(top)});
- E.push({x:360,y:GT-BEAR_R-2});
- E.push({x:560,y:GT-BEAR_R-2});
+ E.push({x:360,y:bearOn(GT)});
+ E.push({x:560,y:bearOn(GT)});
  return {id:'bull-flag',name:'Bull Flag',
   note:'A tall pole then a drift lower. The pole is the heaviest thing on the board, so make it fall right.',
   shots:6,blocks:B,bears:E};
 }
-var LEVELS=[levelDoubleTop(),levelHeadShoulders(),levelBullFlag()];
+// Three funded-account shops. The names are jokes, not the real firms.
+function levelPropFirm(){
+ var B=[],E=[],top;
+ top=tower(B,380,GT,[70,58,46]); B.push(sign(380,top,0)); E.push({x:380,y:bearOn(top-SIGN_H)});
+ top=tower(B,620,GT,[70,58,46]); B.push(sign(620,top,1));
+ top=tower(B,860,GT,[70,58,46]); B.push(sign(860,top,2)); E.push({x:860,y:bearOn(top-SIGN_H)});
+ E.push({x:380,y:bearOn(GT)});
+ E.push({x:620,y:bearOn(GT)});
+ E.push({x:860,y:bearOn(GT)});
+ return {id:'prop-firm',name:'Prop Firm Row',
+  note:'Three funded-account shops. Each shop sign pays $5,000 on the way down. Consistency rule not included.',
+  shots:6,blocks:B,bears:E};
+}
+var LEVELS=[levelDoubleTop(),levelHeadShoulders(),levelBullFlag(),levelPropFirm()];
 
 // Every physical constant lives here, inside the shared block, so the game and
 // the headless harness can never drift apart. Tuned by the harness, not by eye.
@@ -138,20 +155,63 @@ var PHYS={
  positionIterations:16, velocityIterations:10, constraintIterations:4,
  // Sleeping stays OFF. See the note next to the engine.
  sleeping:false,
+ sling:{x:150,y:392},
  ground:{friction:1,frictionStatic:1.2,slop:0.05},
  candle:{restitution:0,friction:0.85,frictionStatic:1.1,frictionAir:0.012,slop:0.05,density:0.0026},
  bear:  {restitution:0,friction:0.95,frictionStatic:1.2,frictionAir:0.012,slop:0.05,density:0.0016},
  bull:  {restitution:0.35,friction:0.6,frictionAir:0.012,slop:0.05,density:0.016},
  bullR:23, maxPull:115, power:0.386,
- hpPost:3, hpBeam:4,
- breakAt:7, breakStep:6,     // damage = ceil((v - breakAt) / breakStep)
- bearKO:4.5                  // relative speed that takes a bear out
+ hpPost:3, hpBeam:4, hpSign:4,
+ breakAt:7, breakStep:6,     // block damage = ceil((v - breakAt) / breakStep)
+ // Bears take damage rather than dying on one speed threshold, so a heavy beam
+ // dropping on a bear from a storey up crushes it even though it is not fast.
+ bearHp:100,
+ bearHurt:2.2,               // relative speed below this does nothing at all
+ crushCap:30,                // cap on the other body's mass: the ground is static,
+                             // so its mass is Infinity and would do infinite damage
+ crushScale:2.4,             // impact damage per unit of (speed x mass)
+ // A bear pinned under rubble takes almost no impacts, so it would sit there
+ // alive and unreachable and the level could never be finished. Resting weight
+ // above crushLoad drains it. One beam alone is under the threshold on purpose.
+ crushLoad:16,
+ crushRate:0.03              // hp lost per tick per unit of mass over crushLoad
 };
+// Matter's resting normal impulse is mass x gravity x scale x delta squared, so
+// dividing an impulse by this converts it back into a mass. That matters because
+// the load on a buried bear must count the whole stack above it, not just the
+// one block touching it. Counting contact masses missed three quarters of a pile.
+PHYS.impulsePerMass=PHYS.gravity*0.001*Math.pow(1000/60,2);
+function contactLoad(pair){
+ var c=pair.contacts||[],imp=0;
+ for(var i=0;i<c.length;i++){if(c[i]&&c[i].normalImpulse)imp+=Math.abs(c[i].normalImpulse);}
+ return imp/PHYS.impulsePerMass;
+}
 function damageAt(v){return Math.ceil((v-PHYS.breakAt)/PHYS.breakStep);}
+function bearDamage(v,otherMass){
+ if(v<=PHYS.bearHurt)return 0;
+ return (v-PHYS.bearHurt)*Math.min(otherMass,PHYS.crushCap)*PHYS.crushScale;
+}
+
+// The board is walled. Without walls the ground ran far wider than the canvas
+// and a bear could roll off the visible board, still alive and impossible to
+// hit, so the level could never be cleared.
+function edgeSpecs(){
+ return [
+  {kind:'ground',x:CW/2,   y:GT+16,  w:CW,   h:32},
+  {kind:'wall',  x:-20,    y:CH/2,   w:40,   h:CH*3},
+  {kind:'wall',  x:CW+20,  y:CH/2,   w:40,   h:CH*3},
+  {kind:'sling', x:PHYS.sling.x, y:GT-74, w:22, h:148}
+ ];
+}
 
 // Scoring, in dollars of profit.
-var PAY_BEAR=2500,PAY_BLOCK=400,PAY_SHOT=3000;
-function maxScore(L){return L.bears.length*PAY_BEAR+L.blocks.length*PAY_BLOCK+(L.shots-1)*PAY_SHOT;}
+var PAY_BEAR=2500,PAY_BLOCK=400,PAY_SIGN=5000,PAY_SHOT=3000;
+function blockPay(spec){return spec.t==='s'?PAY_SIGN:PAY_BLOCK;}
+function maxScore(L){
+ var b=0;
+ L.blocks.forEach(function(s){b+=blockPay(s);});
+ return L.bears.length*PAY_BEAR+b+(L.shots-1)*PAY_SHOT;
+}
 function starCuts(L){var m=maxScore(L);return [Math.round(m*0.50),Math.round(m*0.68),Math.round(m*0.82)];}
 /*LEVELS_END*/
 
@@ -174,7 +234,7 @@ M.Render.run(render);
 M.Runner.run(M.Runner.create(),engine);
 var ctx=render.context;
 
-var START={x:150,y:392},MAXPULL=PHYS.maxPull,POWER=PHYS.power,BULL_R=PHYS.bullR;
+var START=PHYS.sling,MAXPULL=PHYS.maxPull,POWER=PHYS.power,BULL_R=PHYS.bullR;
 // Aim preview constants, fitted against the engine itself by the headless
 // harness. Matter integrates v = v*(1-frictionAir) + gravity*scale*delta^2,
 // so the dotted arc has to damp and drop the same way or it lies to the player.
@@ -198,15 +258,19 @@ function money(n){return '$'+n.toLocaleString('en-US');}
 /* ---------- bodies ---------- */
 function opts(base,extra){var o={},k;for(k in base)o[k]=base[k];for(k in extra)o[k]=extra[k];return o;}
 function candle(spec){
+ var isSign=spec.t==='s';
  var b=M.Bodies.rectangle(spec.x,spec.y,spec.w,spec.h,opts(PHYS.candle,{label:'candle',
-  render:{fillStyle:spec.t==='g'?GREEN:RED,strokeStyle:INK,lineWidth:2}}));
- b.hp=spec.h>spec.w?PHYS.hpPost:PHYS.hpBeam;   // uprights snap sooner than beams
+  render:{fillStyle:isSign?'#FFFFFF':(spec.t==='g'?GREEN:RED),strokeStyle:INK,lineWidth:isSign?3:2}}));
+ b.hp=isSign?PHYS.hpSign:(spec.h>spec.w?PHYS.hpPost:PHYS.hpBeam); // uprights snap sooner than beams
+ b.pay=blockPay(spec);
+ if(isSign)b.logo=spec.logo;
  blocks.push(b);
  return b;
 }
 function bear(x,y){
  var b=M.Bodies.circle(x,y,BEAR_R,opts(PHYS.bear,{label:'bear',render:{visible:false}}));
  M.Body.setInertia(b,Infinity);   // bears are circles on flat beams, so lock the roll
+ b.hp=PHYS.bearHp;b.load=0;
  bears.push(b);
  return b;
 }
@@ -217,10 +281,11 @@ function build(){
  blocks=[];bears=[];bulls=[];active=null;pops=[];
  shots=L.shots;score=0;over=false;
  document.getElementById('banner').classList.remove('on');
- var parts=[
-  M.Bodies.rectangle(500,GT+16,2400,32,opts(PHYS.ground,{isStatic:true,render:{fillStyle:'#7FA85C'}})),
-  M.Bodies.rectangle(START.x,GT-74,22,148,opts(PHYS.ground,{isStatic:true,render:{fillStyle:'#8B5E3C'}}))
- ];
+ var skin={ground:'#7FA85C',sling:'#8B5E3C',wall:'#EAF3FB'};
+ var parts=edgeSpecs().map(function(e){
+  return M.Bodies.rectangle(e.x,e.y,e.w,e.h,opts(PHYS.ground,{isStatic:true,
+   render:{fillStyle:skin[e.kind],strokeStyle:skin[e.kind],lineWidth:1}}));
+ });
  L.blocks.forEach(function(s){parts.push(candle(s));});
  L.bears.forEach(function(s){parts.push(bear(s.x,s.y));});
  M.Composite.add(engine.world,parts);
@@ -305,19 +370,35 @@ function killBear(b){
 function breakBlock(b){
  M.Composite.remove(engine.world,b);
  blocks=blocks.filter(function(x){return x!==b;});
- award(PAY_BLOCK,b.position.x,b.position.y);
+ award(b.pay||PAY_BLOCK,b.position.x,b.position.y);
 }
 M.Events.on(engine,'collisionStart',function(e){
  e.pairs.forEach(function(p){
   var v=relSpeed(p.bodyA,p.bodyB);
   [[p.bodyA,p.bodyB],[p.bodyB,p.bodyA]].forEach(function(pr){
-   var b=pr[0];
+   var b=pr[0],o=pr[1];
    if(over)return;
-   if(b.label==='bear'&&v>PHYS.bearKO&&bears.indexOf(b)>=0){killBear(b);return;}
+   if(b.label==='bear'&&bears.indexOf(b)>=0){
+    b.hp-=bearDamage(v,o.mass);
+    if(b.hp<=0)killBear(b);
+    return;
+   }
    if(b.label==='candle'&&v>PHYS.breakAt&&blocks.indexOf(b)>=0){
     b.hp-=damageAt(v);
     if(b.hp<=0)breakBlock(b);
    }
+  });
+ });
+});
+// Weight resting on a bear, measured from the solver's own contact impulse so
+// the whole pile above counts, not just the one block in contact. Only bodies
+// whose centre is above the bear count, so a bear standing on a beam is safe.
+M.Events.on(engine,'collisionActive',function(e){
+ e.pairs.forEach(function(p){
+  [[p.bodyA,p.bodyB],[p.bodyB,p.bodyA]].forEach(function(pr){
+   var b=pr[0],o=pr[1];
+   if(b.label!=='bear'||o.isStatic)return;
+   if(o.position.y<b.position.y)b.load+=contactLoad(p);
   });
  });
 });
@@ -369,7 +450,11 @@ M.Events.on(engine,'afterUpdate',function(){
   }
  }
  for(var j=bears.length-1;j>=0;j--){
-  if(bears[j].position.y>H+60){killBear(bears[j]);}
+  var br=bears[j];
+  if(br.position.y>H+60){killBear(br);continue;}
+  if(br.load>PHYS.crushLoad)br.hp-=(br.load-PHYS.crushLoad)*PHYS.crushRate;
+  br.load=0;
+  if(br.hp<=0)killBear(br);
  }
  for(var k=blocks.length-1;k>=0;k--){
   var c=blocks[k];
@@ -426,6 +511,46 @@ function bearArt(g,r){
  g.beginPath();g.ellipse(0,0.22*r,0.16*r,0.11*r,0,0,6.3);g.fill();
  faceArt(g,r,-0.62,-0.36);
 }
+/* ---------- prop firm shop signs ---------- */
+// Parody names and original marks. These are jokes about the funded-account
+// model, not the branding of any real firm.
+function logoPeak(g,r){
+ g.fillStyle='#2E9E5B';g.strokeStyle=INK;g.lineWidth=2;g.lineJoin='round';
+ g.beginPath();g.moveTo(-r,r*0.82);g.lineTo(0,-r);g.lineTo(r,r*0.82);g.closePath();g.fill();g.stroke();
+ g.strokeStyle='#D9453A';g.lineWidth=3;g.lineCap='round';g.lineJoin='round';
+ g.beginPath();g.moveTo(0,-r*0.45);g.lineTo(0,r*0.5);g.stroke();
+ g.beginPath();g.moveTo(-r*0.4,r*0.1);g.lineTo(0,r*0.52);g.lineTo(r*0.4,r*0.1);g.stroke();
+}
+function logoSteps(g,r){
+ g.fillStyle='#C9962B';g.strokeStyle=INK;g.lineWidth=2;g.lineJoin='round';
+ var w=r*0.6;
+ g.beginPath();g.rect(-r,r*0.2,w,r*0.8);g.fill();g.stroke();
+ g.beginPath();g.rect(-r+w,-r*0.25,w,r*1.25);g.fill();g.stroke();
+ g.save();g.translate(-r+w*2.4,-r*0.5);g.rotate(0.6);
+ g.beginPath();g.rect(-w/2,-r*0.42,w,r*0.84);g.fill();g.stroke();
+ g.restore();
+}
+function logoNo(g,r){
+ g.strokeStyle='#D9453A';g.lineWidth=r*0.3;g.lineCap='butt';
+ g.beginPath();g.arc(0,0,r*0.76,0,6.3);g.stroke();
+ g.beginPath();g.moveTo(-r*0.54,r*0.54);g.lineTo(r*0.54,-r*0.54);g.stroke();
+}
+var FIRMS=[
+ {name:'APEKS',draw:logoPeak},
+ {name:'TOPSTUMBLE',draw:logoSteps},
+ {name:'FTM-NO',draw:logoNo}
+];
+// Only the mark and the name. Matter already draws the white board underneath.
+function signArt(g,w,h,firm){
+ g.save();g.translate(-w/2+24,0);firm.draw(g,13);g.restore();
+ var size=14,maxW=w-52;
+ do{g.font='bold '+size+'px "Trebuchet MS",Verdana,sans-serif';size--;}
+ while(g.measureText(firm.name).width>maxW&&size>6);
+ g.fillStyle=INK;g.textAlign='left';g.textBaseline='middle';
+ g.fillText(firm.name,-w/2+42,1);
+ g.textAlign='start';g.textBaseline='alphabetic';
+}
+
 var SS=3;
 function sprite(fn,r){
  var half=Math.ceil(r*1.9),c=document.createElement('canvas');
@@ -435,6 +560,19 @@ function sprite(fn,r){
  return{img:c,half:half};
 }
 var SP_BULL=sprite(bullArt,BULL_R),SP_BEAR=sprite(bearArt,BEAR_R);
+function boardSprite(firm,w,h){
+ var c=document.createElement('canvas');
+ c.width=w*SS;c.height=h*SS;
+ var g=c.getContext('2d');g.scale(SS,SS);g.translate(w/2,h/2);
+ signArt(g,w,h,firm);
+ return{img:c,w:w,h:h};
+}
+var SP_SIGN=FIRMS.map(function(f){return boardSprite(f,SIGN_W,SIGN_H);});
+function stampBoard(sp,x,y,a){
+ ctx.save();ctx.translate(x,y);ctx.rotate(a);
+ ctx.drawImage(sp.img,-sp.w/2,-sp.h/2,sp.w,sp.h);
+ ctx.restore();
+}
 function stamp(s,x,y,a){
  ctx.save();ctx.translate(x,y);ctx.rotate(a);
  ctx.drawImage(s.img,-s.half,-s.half,s.half*2,s.half*2);
@@ -466,7 +604,34 @@ M.Events.on(render,'afterRender',function(){
    ctx.beginPath();ctx.arc(px,py,3,0,6.3);ctx.fill();
   }
  }
- bears.forEach(function(b){stamp(SP_BEAR,b.position.x,b.position.y,b.angle);});
+ // The leverage joke. Full pull is 100 percent, and the bar goes red there.
+ if(dragging&&active){
+  var pct=Math.round(Math.min(Math.hypot(mx-START.x,my-START.y),MAXPULL)/MAXPULL*100);
+  var maxed=pct>=100,bx=30,by=42,bw=180,bh=18;
+  ctx.font='bold 13px "Trebuchet MS",Verdana,sans-serif';
+  ctx.textAlign='left';
+  ctx.fillStyle=maxed?'#D9453A':'#6B5A4A';
+  ctx.fillText(maxed?'MAX LEVERAGE 100%':'LEVERAGE '+pct+'%',bx,by-8);
+  ctx.fillStyle='#FFFFFF';ctx.fillRect(bx,by,bw,bh);
+  ctx.fillStyle=maxed?'#D9453A':(pct>75?'#C9962B':'#2E9E5B');
+  ctx.fillRect(bx+3,by+3,(bw-6)*pct/100,bh-6);
+  ctx.strokeStyle=INK;ctx.lineWidth=3;ctx.strokeRect(bx,by,bw,bh);
+  ctx.textAlign='start';
+ }
+ blocks.forEach(function(b){
+  if(b.logo!=null)stampBoard(SP_SIGN[b.logo],b.position.x,b.position.y,b.angle);
+ });
+ bears.forEach(function(b){
+  stamp(SP_BEAR,b.position.x,b.position.y,b.angle);
+  // A ring showing what is left of a bear being crushed. It only appears once
+  // a bear is properly hurt, because settling a tower costs every bear a point
+  // or two and a near-full ring on every bear at level start reads as noise.
+  if(b.hp<PHYS.bearHp*0.9){
+   ctx.beginPath();
+   ctx.arc(b.position.x,b.position.y,BEAR_R+7,-1.5708,-1.5708+6.2832*Math.max(b.hp,0)/PHYS.bearHp);
+   ctx.strokeStyle='#D9453A';ctx.lineWidth=4;ctx.lineCap='round';ctx.stroke();
+  }
+ });
  bulls.forEach(function(b){
   if(b===active&&dp)stamp(SP_BULL,dp.x,dp.y,0);
   else stamp(SP_BULL,b.position.x,b.position.y,b.angle);
